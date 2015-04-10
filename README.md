@@ -38,3 +38,8 @@ fn main() {
     from_the_top(vec![input, output]);
 }
 ```
+
+### Licensing
+
+Chekhov is licensed under the GNU Lesser General Public License, version 3.0 or
+higher, at your choice.
