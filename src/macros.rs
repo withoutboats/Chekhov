@@ -15,7 +15,7 @@
 
 #[macro_export]
 macro_rules! actor_mut {
-    {$actor:ident ($( $arg:ident : $t:ty ),*) |> $binding:ident : $reads:ty => $script:expr} => {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) :: $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>, $( $t, )*) + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,
@@ -64,7 +64,7 @@ macro_rules! actor_mut {
 
 #[macro_export]
 macro_rules! actor {
-    {$actor:ident ($( $arg:ident : $t:ty ),*) |> $binding:ident : $reads:ty => $script:expr} => {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) :: $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>, $( $t, )*) + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,

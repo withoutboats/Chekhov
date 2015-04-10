@@ -26,7 +26,7 @@ use std::io;
 use std::io::Write;
 use chekhov::*;
 
-actor!{ PrefixedPrinter(prefix: String) |> msg: String => {
+actor!{ PrefixedPrinter(prefix: String) :: msg: String => {
     println!("{}", prefix.clone() + &msg);
 }}
  

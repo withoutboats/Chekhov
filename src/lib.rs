@@ -42,7 +42,7 @@
 //! # #![feature(core)]
 //! # #[macro_use(actor)]
 //! # extern crate chekhov;
-//! actor!{ PrefixedPrinter(prefix: String) |> msg: String => {
+//! actor!{ PrefixedPrinter(prefix: String) :: msg: String => {
 //!     println!("{}", prefix.clone() + &msg);
 //! }}
 //! # fn main() {  }
@@ -57,9 +57,9 @@
 //! 3. The Actor's name takes parens, just like a function or a tuple struct. If the Actor takes
 //!    any arguments when it is constructed and initialized, these are listed here. Even if the
 //!    Actor does not take arguments, the parens are required.
-//! 4. If the Actor has a mail box, you have to declare it with the 'mailbox flag' symbol, `|>`.
-//!    This is followed by the binding and type of the messages the actor receives.
-//!    (If the actor is of the type that do not receive messages, do not include any of this).
+//! 4. If the Actor has a mail box, you have to declare it the binding and type of the mailbox,
+//!    preceded by the '::' symbol. (If the actor is of the type that do not receive messages, do
+//!    not include any of this).
 //! 5. This is followed by the fat arrow `=>` (Not a normal function arrow!) and a block which
 //!    defines the body of the actor; this block is what will be called every time the actor
 //!    receives a message, or on a continuous loop if the actor does not take messages.
@@ -134,7 +134,7 @@
 //! use std::io::Write;
 //! use chekhov::*;
 //!
-//! actor!{ PrefixedPrinter(prefix: String) |> msg: String => {
+//! actor!{ PrefixedPrinter(prefix: String) :: msg: String => {
 //!     println!("{}", prefix.clone() + &msg);
 //! }}
 //! 
