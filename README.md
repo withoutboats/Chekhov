@@ -16,7 +16,7 @@ program written using Chekhov:
 ```
 #![feature(core)]
 
-#[macro_use(actor, feeder)]
+#[macro_use(actor)]
 extern crate chekhov;
 
 use chekhov::*;
