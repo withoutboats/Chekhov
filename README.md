@@ -1,4 +1,4 @@
-##Chekhov makes actor/message concurrency in Rust very easy
+###Chekhov makes actor/message concurrency in Rust easy.
 
 Chekhov is a concurrency framework for Rust focused on simplicity and ease of
 use. Using Chekhov, you can briskly create __actors__ which communicate by
