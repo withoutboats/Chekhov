@@ -40,6 +40,25 @@ macro_rules! actor_mut {
             }
         }
     };
+    {$actor:ident ($( $arg:ident : $t:ty ),*) -> $script:expr} => {
+        struct $actor {
+            func: Box<::std::boxed::FnBox($( $t, )*) + Send>,
+            $( $arg : $t, )*
+        }
+        impl $actor {
+            fn new($( $arg: $t, )*) -> Box<$crate::Feeder<$actor>> {
+                Box::new($crate::Feeder($actor {
+                    func: Box::new(|$( mut $arg: $t, )*| loop { $script }),
+                    $( $arg: $arg, )*
+                }))
+            }
+        }
+        impl $crate::ActorThread<Null> for $actor {
+            fn go(self) {
+                ::std::thread::spawn(move || (self.func)($( self.$arg, )*));
+            }
+        }
+    };
 }
 
 #[macro_export]
@@ -90,64 +109,37 @@ macro_rules! actor {
             }
         }
     };
-}
-
-#[macro_export]
-macro_rules! feeder_mut {
-    {$feeder:ident ($( $arg:ident : $t:ty ),*) -> $script:expr} => {
-        struct $feeder {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) -> $script:expr} => {
+        struct $actor {
             func: Box<::std::boxed::FnBox($( $t, )*) + Send>,
             $( $arg : $t, )*
         }
-        impl $feeder {
-            fn new($( $arg: $t, )*) -> Box<$crate::Feeder<$feeder>> {
-                Box::new($crate::Feeder($feeder {
-                    func: Box::new(|$( mut $arg: $t, )*| loop { $script }),
-                    $( $arg: $arg, )*
-                }))
-            }
-        }
-        impl $crate::ActorThread<Null> for $feeder {
-            fn go(self) {
-                ::std::thread::spawn(move || (self.func)($( self.$arg, )*));
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! feeder {
-    {$feeder:ident ($( $arg:ident : $t:ty ),*) -> $script:expr} => {
-        struct $feeder {
-            func: Box<::std::boxed::FnBox($( $t, )*) + Send>,
-            $( $arg : $t, )*
-        }
-        impl $feeder {
-            fn new($( $arg: $t, )*) -> Box<$crate::Feeder<$feeder>> {
-                Box::new($crate::Feeder($feeder {
+        impl $actor {
+            fn new($( $arg: $t, )*) -> Box<$crate::Feeder<$actor>> {
+                Box::new($crate::Feeder($actor {
                     func: Box::new(|$( $arg: $t, )*| loop { $script }),
                     $( $arg: $arg, )*
                 }))
             }
         }
-        impl $crate::ActorThread<$crate::Null> for $feeder {
+        impl $crate::ActorThread<$crate::Null> for $actor {
             fn go(self) {
                 ::std::thread::spawn(move || (self.func)($( self.$arg, )*));
             }
         }
     };
-    {$feeder:ident (  ) -> $script:expr} => {
-        struct $feeder {
+    {$actor:ident (  ) -> $script:expr} => {
+        struct $actor {
             func: Box<::std::boxed::FnBox() + Send>,
         }
-        impl $feeder {
-            fn new() -> Box<$crate::Feeder<$feeder>> {
-                Box::new($crate::Feeder($feeder {
+        impl $actor {
+            fn new() -> Box<$crate::Feeder<$actor>> {
+                Box::new($crate::Feeder($actor {
                     func: Box::new(|| loop { $script }),
                 }))
             }
         }
-        impl $crate::ActorThread<$crate::Null> for $feeder {
+        impl $crate::ActorThread<$crate::Null> for $actor {
             fn go(self) {
                 ::std::thread::spawn(move || (self.func)());
             }
