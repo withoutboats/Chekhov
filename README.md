@@ -39,6 +39,16 @@ fn main() {
 }
 ```
 
+### Rust version compatibility
+
+Sadly, Chekhov is dependent on the unstable feature FnBox, so it is currently 
+only compatibile with the nightly track of Rust. Chekhov uses no other unstable
+features and should be compatible with the first stable branch that includes
+FnBox.
+
+If you know a way to perform a function application on a new thread without
+using FnBox or any other unstable features, please let me know. :-)
+
 ### Licensing
 
 Chekhov is licensed under the GNU Lesser General Public License, version 3.0 or
