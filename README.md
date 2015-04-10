@@ -59,5 +59,5 @@ using FnBox or any other unstable features, please let me know. :-)
 
 ### Licensing
 
-Chekhov is licensed under the GNU Lesser General Public License, version 3.0 or
-higher, at your choice.
+Chekhov is licensed under the GNU General Public License, version 3.0 or
+higher, at your choice, with the Classpath Library Linking Exception.
