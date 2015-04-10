@@ -88,28 +88,6 @@ macro_rules! actor {
             }
         }
     };
-    {$actor:ident (  ) |> $binding:ident : $reads:ty => $script:expr} => {
-        struct $actor {
-            func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>) + Send>,
-            rx: ::std::sync::mpsc::Receiver<$reads>,
-        }
-        impl $actor {
-            fn new() -> Box<$crate::ProspectiveActor<$reads, $actor>> {
-                let (tx, rx) = ::std::sync::mpsc::channel();
-                Box::new($crate::ProspectiveActor($actor {
-                    func: Box::new(|rx: ::std::sync::mpsc::Receiver<$reads>| {
-                        while let Ok($binding) = rx.recv() { $script }
-                    }),
-                    rx: rx,
-                }, tx))
-            }
-        }
-        impl<$reads> $crate::ActorThread<$reads> for $actor {
-            fn go(self) {
-                std::thread::spawn(move || (self.func)(self.rx));
-            }
-        }
-    };
     {$actor:ident ($( $arg:ident : $t:ty ),*) => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox($( $t, )*) + Send>,
@@ -126,23 +104,6 @@ macro_rules! actor {
         impl $crate::ActorThread<$crate::Null> for $actor {
             fn go(self) {
                 ::std::thread::spawn(move || (self.func)($( self.$arg, )*));
-            }
-        }
-    };
-    {$actor:ident (  ) => $script:expr} => {
-        struct $actor {
-            func: Box<::std::boxed::FnBox() + Send>,
-        }
-        impl $actor {
-            fn new() -> Box<$crate::IsolatedActor<$actor>> {
-                Box::new($crate::IsolatedActor($actor {
-                    func: Box::new(|| loop { $script }),
-                }))
-            }
-        }
-        impl $crate::ActorThread<$crate::Null> for $actor {
-            fn go(self) {
-                ::std::thread::spawn(move || (self.func)());
             }
         }
     };
