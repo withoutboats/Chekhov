@@ -15,7 +15,7 @@
 
 #[macro_export]
 macro_rules! actor_mut {
-    {$actor:ident ($( $arg:ident : $t:ty ),*) -> |$reads:ty : $binding:ident| $script:expr} => {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) |> $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>, $( $t, )*) + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,
@@ -23,9 +23,9 @@ macro_rules! actor_mut {
         }
         #[allow(unused_mut)]
         impl $actor {
-            fn new($( $arg: $t, )*) -> $crate::BackstageActor<$reads, $actor> {
+            fn new($( $arg: $t, )*) -> Box<$crate::ProspectiveActor<$reads, $actor>> {
                 let (tx, rx) = ::std::sync::mpsc::channel();
-                Box::new($crate::ActorBuilder($actor {
+                Box::new($crate::ProspectiveActor($actor {
                     func: Box::new(|rx: ::std::sync::mpsc::Receiver<$reads>, $( mut $arg: $t, )*| 
                         while let Ok($binding) = rx.recv() { $script }
                     ),
@@ -40,14 +40,15 @@ macro_rules! actor_mut {
             }
         }
     };
-    {$actor:ident ($( $arg:ident : $t:ty ),*) -> $script:expr} => {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox($( $t, )*) + Send>,
             $( $arg : $t, )*
         }
+        #[allow(unused_mut)]
         impl $actor {
-            fn new($( $arg: $t, )*) -> Box<$crate::Feeder<$actor>> {
-                Box::new($crate::Feeder($actor {
+            fn new($( $arg: $t, )*) -> Box<$crate::IsolatedActor<$actor>> {
+                Box::new($crate::IsolatedActor($actor {
                     func: Box::new(|$( mut $arg: $t, )*| loop { $script }),
                     $( $arg: $arg, )*
                 }))
@@ -63,16 +64,16 @@ macro_rules! actor_mut {
 
 #[macro_export]
 macro_rules! actor {
-    {$actor:ident ($( $arg:ident : $t:ty ),*) -> |$reads:ty : $binding:ident| $script:expr} => {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) |> $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>, $( $t, )*) + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,
             $( $arg: $t, )*
         }
         impl $actor {
-            fn new($( $arg: $t, )*) -> $crate::BackstageActor<$reads, $actor> {
+            fn new($( $arg: $t, )*) -> Box<$crate::ProspectiveActor<$reads, $actor>> {
                 let (tx, rx) = ::std::sync::mpsc::channel();
-                Box::new($crate::ActorBuilder($actor {
+                Box::new($crate::ProspectiveActor($actor {
                     func: Box::new(|rx: ::std::sync::mpsc::Receiver<$reads>, $( $arg: $t, )*| 
                         while let Ok($binding) = rx.recv() { $script }
                     ),
@@ -87,15 +88,15 @@ macro_rules! actor {
             }
         }
     };
-    {$actor:ident (  ) -> |$reads:ty : $binding:ident| $script:expr} => {
+    {$actor:ident (  ) |> $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>) + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,
         }
         impl $actor {
-            fn new() -> $crate::BackstageActor<$reads, $actor> {
+            fn new() -> Box<$crate::ProspectiveActor<$reads, $actor>> {
                 let (tx, rx) = ::std::sync::mpsc::channel();
-                Box::new($crate::ActorBuilder($actor {
+                Box::new($crate::ProspectiveActor($actor {
                     func: Box::new(|rx: ::std::sync::mpsc::Receiver<$reads>| {
                         while let Ok($binding) = rx.recv() { $script }
                     }),
@@ -109,14 +110,14 @@ macro_rules! actor {
             }
         }
     };
-    {$actor:ident ($( $arg:ident : $t:ty ),*) -> $script:expr} => {
+    {$actor:ident ($( $arg:ident : $t:ty ),*) => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox($( $t, )*) + Send>,
             $( $arg : $t, )*
         }
         impl $actor {
-            fn new($( $arg: $t, )*) -> Box<$crate::Feeder<$actor>> {
-                Box::new($crate::Feeder($actor {
+            fn new($( $arg: $t, )*) -> Box<$crate::IsolatedActor<$actor>> {
+                Box::new($crate::IsolatedActor($actor {
                     func: Box::new(|$( $arg: $t, )*| loop { $script }),
                     $( $arg: $arg, )*
                 }))
@@ -128,13 +129,13 @@ macro_rules! actor {
             }
         }
     };
-    {$actor:ident (  ) -> $script:expr} => {
+    {$actor:ident (  ) => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox() + Send>,
         }
         impl $actor {
-            fn new() -> Box<$crate::Feeder<$actor>> {
-                Box::new($crate::Feeder($actor {
+            fn new() -> Box<$crate::IsolatedActor<$actor>> {
+                Box::new($crate::IsolatedActor($actor {
                     func: Box::new(|| loop { $script }),
                 }))
             }

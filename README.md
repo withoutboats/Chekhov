@@ -11,31 +11,39 @@ feature complete, not necessarily optimized, and probably brittle in several
 ways. __Pull requests welcome,__ especially those that address these things or
 make Chekhov's naming scheme into more goofy acting jargon.
 
-Documentation forthcoming soon. For now here's a simple multi-threaded echo
-program written using Chekhov:
+There's basic documentation at the top of the main lib file, which you can
+format into quite attractive HTML docs with `cargo doc` (I will have it uploaded
+to the web soon enough). As a sample of how Chekhov works, here is the echo
+program built in those docs:
+
 ```
 #![feature(core)]
 
-#[macro_use(actor)]
+#[macro_use]
 extern crate chekhov;
 
+use std::io;
+use std::io::Write;
 use chekhov::*;
 
-actor!{ Input(next: Actor<String>) -> {
-    let mut echo = String::new();
-    if std::io::stdin().read_line(&mut echo).is_ok() {
-        next.cue(echo);
+actor!{ PrefixedPrinter(prefix: String) |> msg: String => {
+    println!("{}", prefix.clone() + &msg);
+}}
+ 
+actor_mut!{ EnumeratedReader(next: Actor<String>, x: u32) => {
+    print!("{}. ", x);
+    io::stdout().flush().ok();
+    x += 1;
+    let mut buffer = String::new();
+    if io::stdin().read_line(&mut buffer).is_ok() {
+        next.cue(buffer);
     }
 }}
 
-actor!{ Output() -> |String: echo| {
-    print!("{}", echo);
-}}
-
 fn main() {
-    let output = Output::new();
-    let input = Input::new(output.stage());
-    from_the_top(vec![input, output]);
+    let printer = PrefixedPrinter::new(">>> ".to_string());
+    let reader = EnumeratedReader::new(printer.stage(), 1);
+    from_the_top(vec![printer, reader]);
 }
 ```
 

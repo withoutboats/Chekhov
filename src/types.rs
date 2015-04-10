@@ -13,20 +13,18 @@
 
 use std::sync::mpsc::Sender;
 
-pub type BackstageActor<T, A> = Box<ActorBuilder<T, A>>;
-
 #[derive(Clone)]
 pub struct Actor<T: Send>(Sender<T>);
 
-pub struct ActorBuilder<T: Send, A: ActorThread<T>>(pub A, pub Sender<T>);
+pub struct ProspectiveActor<T: Send, A: ActorThread<T>>(pub A, pub Sender<T>);
 
-impl<T: Send, A: ActorThread<T>> ActorBuilder<T, A> {
+impl<T: Send, A: ActorThread<T>> ProspectiveActor<T, A> {
     pub fn stage(&self)-> Actor<T> {
         Actor(self.1.clone())
     }
 }
 
-pub struct Feeder<A: ActorThread<Null>>(pub A);
+pub struct IsolatedActor<A: ActorThread<Null>>(pub A);
 
 pub struct Null;
 
@@ -34,13 +32,13 @@ pub trait Actionable {
     fn action(self: Box<Self>); 
 }
 
-impl<T: Send, A: ActorThread<T>> Actionable for ActorBuilder<T, A> {
+impl<T: Send, A: ActorThread<T>> Actionable for ProspectiveActor<T, A> {
     fn action(self: Box<Self>) {
         self.0.go();
     }
 }
 
-impl<A: ActorThread<Null>> Actionable for Feeder<A> {
+impl<A: ActorThread<Null>> Actionable for IsolatedActor<A> {
     fn action(self: Box<Self>) {
         self.0.go();
     }
@@ -58,7 +56,7 @@ impl<T: Send> Cueable for Actor<T> {
     }
 }
 
-impl<T: Send, A: ActorThread<T>> Cueable for ActorBuilder<T, A> {
+impl<T: Send, A: ActorThread<T>> Cueable for ProspectiveActor<T, A> {
     type Message = T;
     fn cue(&self, data: T) {
         self.1.send(data).ok();
