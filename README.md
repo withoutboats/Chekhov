@@ -16,7 +16,7 @@ format into quite attractive HTML docs with `cargo doc` (I will have it uploaded
 to the web soon enough). As a sample of how Chekhov works, here is the echo
 program built in those docs:
 
-```
+```rust
 #![feature(core)]
 
 #[macro_use]
