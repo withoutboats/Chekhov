@@ -39,6 +39,8 @@ impl<A: ActorThread<Null>> IsolatedActor<A> {
 
 pub struct Null;
 
+pub struct CueError;
+
 pub trait Actionable {
     fn action(self: Box<Self>); 
 }
@@ -57,20 +59,20 @@ impl<A: ActorThread<Null>> Actionable for IsolatedActor<A> {
 
 pub trait Cueable {
     type Message: Send;
-    fn cue(&self, data: Self::Message);
+    fn cue(&self, data: Self::Message) -> Result<(), CueError>;
 }
 
 impl<T: Send> Cueable for Actor<T> {
     type Message = T;
-    fn cue(&self, data: T) {
-       self.0.send(data).ok();
+    fn cue(&self, data: T) -> Result<(), CueError> {
+       self.0.send(data).map_err(|_| CueError)
     }
 }
 
 impl<T: Send, A: ActorThread<T>> Cueable for ProspectiveActor<T, A> {
     type Message = T;
-    fn cue(&self, data: T) {
-        self.1.send(data).ok();
+    fn cue(&self, data: T) -> Result<(), CueError> {
+        self.1.send(data).map_err(|_| CueError)
     }
 }
 

@@ -80,7 +80,7 @@
 //!     x += 1;
 //!     let mut buffer = String::new();
 //!     if io::stdin().read_line(&mut buffer).is_ok() {
-//!         next.cue(buffer);
+//!         try!(next.cue(buffer));
 //!     }
 //! }}
 //! # fn main() {  }
@@ -144,7 +144,7 @@
 //!     x += 1;
 //!     let mut buffer = String::new();
 //!     if io::stdin().read_line(&mut buffer).is_ok() {
-//!         next.cue(buffer);
+//!         try!(next.cue(buffer));
 //!     }
 //! }}
 //!
