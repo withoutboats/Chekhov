@@ -16,15 +16,26 @@ use std::sync::mpsc::Sender;
 #[derive(Clone)]
 pub struct Actor<T: Send>(Sender<T>);
 
-pub struct ProspectiveActor<T: Send, A: ActorThread<T>>(pub A, pub Sender<T>);
+pub struct ProspectiveActor<T: Send, A: ActorThread<T>>(A, Sender<T>);
 
 impl<T: Send, A: ActorThread<T>> ProspectiveActor<T, A> {
+
+    pub fn new(actor: A, tx: Sender<T>) -> ProspectiveActor<T, A> {
+        ProspectiveActor(actor, tx)
+    }
+
     pub fn stage(&self)-> Actor<T> {
         Actor(self.1.clone())
     }
 }
 
-pub struct IsolatedActor<A: ActorThread<Null>>(pub A);
+pub struct IsolatedActor<A: ActorThread<Null>>(A);
+
+impl<A: ActorThread<Null>> IsolatedActor<A> {
+    pub fn new(actor: A) -> IsolatedActor<A> {
+        IsolatedActor(actor)
+    }
+}
 
 pub struct Null;
 

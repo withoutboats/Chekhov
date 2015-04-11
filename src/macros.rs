@@ -25,7 +25,7 @@ macro_rules! actor_mut {
         impl $actor {
             fn new($( $arg: $t, )*) -> Box<$crate::ProspectiveActor<$reads, $actor>> {
                 let (tx, rx) = ::std::sync::mpsc::channel();
-                Box::new($crate::ProspectiveActor($actor {
+                Box::new($crate::ProspectiveActor::new($actor {
                     func: Box::new(|rx: ::std::sync::mpsc::Receiver<$reads>, $( mut $arg: $t, )*| 
                         while let Ok($binding) = rx.recv() { $script }
                     ),
@@ -48,7 +48,7 @@ macro_rules! actor_mut {
         #[allow(unused_mut)]
         impl $actor {
             fn new($( $arg: $t, )*) -> Box<$crate::IsolatedActor<$actor>> {
-                Box::new($crate::IsolatedActor($actor {
+                Box::new($crate::IsolatedActor::new($actor {
                     func: Box::new(|$( mut $arg: $t, )*| loop { $script }),
                     $( $arg: $arg, )*
                 }))
@@ -73,7 +73,7 @@ macro_rules! actor {
         impl $actor {
             fn new($( $arg: $t, )*) -> Box<$crate::ProspectiveActor<$reads, $actor>> {
                 let (tx, rx) = ::std::sync::mpsc::channel();
-                Box::new($crate::ProspectiveActor($actor {
+                Box::new($crate::ProspectiveActor::new($actor {
                     func: Box::new(|rx: ::std::sync::mpsc::Receiver<$reads>, $( $arg: $t, )*| 
                         while let Ok($binding) = rx.recv() { $script }
                     ),
@@ -95,7 +95,7 @@ macro_rules! actor {
         }
         impl $actor {
             fn new($( $arg: $t, )*) -> Box<$crate::IsolatedActor<$actor>> {
-                Box::new($crate::IsolatedActor($actor {
+                Box::new($crate::IsolatedActor::new($actor {
                     func: Box::new(|$( $arg: $t, )*| loop { $script }),
                     $( $arg: $arg, )*
                 }))
