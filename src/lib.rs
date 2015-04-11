@@ -159,7 +159,7 @@
 use std::thread;
 
 mod macros;
-mod types;
+pub mod types;
 
 pub use types::*;
 

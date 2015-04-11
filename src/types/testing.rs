@@ -14,7 +14,7 @@
 use std::iter::Unfold;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::Actor;
+use super::{Actor, Cueable, ActorError};
 
 pub struct Understudy<T: Send>(Sender<T>, Receiver<T>);
 
@@ -41,6 +41,15 @@ impl<T: Send> Understudy<T> {
 
 }
 
+impl<T: Send> Cueable for Understudy<T> {
+    type Message = T;
+
+    fn cue(&self, data: T) -> Result<(), ActorError> {
+        self.0.send(data).map_err(|_| ActorError::CueError)
+    }
+
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -58,6 +67,13 @@ mod tests {
         let fount = Fount5::new(next.stage());
         fount.action();
         assert_eq!(next.read_all(), vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn it_can_be_cued_directly() {
+        let understudy: Understudy<u8> = super::Understudy::new();
+        assert!(understudy.cue(0).is_ok());
+        assert_eq!(understudy.read_all(), vec![0]);
     }
 
 }

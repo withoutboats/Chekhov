@@ -113,7 +113,7 @@ macro_rules! actor {
 }
 
 
-#[macro_use]
+#[macro_export]
 macro_rules! break_a_leg {
     () => ( return Ok(()); );
     ($log:expr) => ( return ActorError::Internal(($log).to_string()) );
