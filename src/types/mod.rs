@@ -1,17 +1,21 @@
 // This file is a part of Chekhov, an actor/model concurrency framework for Rust.
 //
-// Chekhov is free software; you can redistribute it and/or modify it under the terms of the Lesser
-// GNU General Public License as published by the Free Software Foundation, either version 3 of the
+// Chekhov is free software; you can redistribute it and/or modify it under the terms of the GNU
+// General Public License as published by the Free Software Foundation, either version 3 of the
 // License or (at your option) any later version.
 //
 // Chekhov is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
 // even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-// Lesser General Public License for more details.
+// General Public License for more details.
 //
-// You should have received a copy of the GNU Lesser General Public License along with Chekhov. If
-// not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License along with Chekhov. If not see
+// <https://www.gnu.org/licenses/>.
+
+mod testing;
 
 use std::sync::mpsc::Sender;
+
+pub use self::testing::Understudy;
 
 #[derive(Clone)]
 pub struct Actor<T: Send>(Sender<T>);
@@ -39,7 +43,10 @@ impl<A: ActorThread<Null>> IsolatedActor<A> {
 
 pub struct Null;
 
-pub struct CueError;
+pub enum ActorError {
+    CueError,
+    Internal(String),
+}
 
 pub trait Actionable {
     fn action(self: Box<Self>); 
@@ -59,20 +66,20 @@ impl<A: ActorThread<Null>> Actionable for IsolatedActor<A> {
 
 pub trait Cueable {
     type Message: Send;
-    fn cue(&self, data: Self::Message) -> Result<(), CueError>;
+    fn cue(&self, data: Self::Message) -> Result<(), ActorError>;
 }
 
 impl<T: Send> Cueable for Actor<T> {
     type Message = T;
-    fn cue(&self, data: T) -> Result<(), CueError> {
-       self.0.send(data).map_err(|_| CueError)
+    fn cue(&self, data: T) -> Result<(), ActorError> {
+       self.0.send(data).map_err(|_| ActorError::CueError)
     }
 }
 
 impl<T: Send, A: ActorThread<T>> Cueable for ProspectiveActor<T, A> {
     type Message = T;
-    fn cue(&self, data: T) -> Result<(), CueError> {
-        self.1.send(data).map_err(|_| CueError)
+    fn cue(&self, data: T) -> Result<(), ActorError> {
+        self.1.send(data).map_err(|_| ActorError::CueError)
     }
 }
 

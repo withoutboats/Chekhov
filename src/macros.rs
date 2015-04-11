@@ -1,15 +1,15 @@
 // This file is a part of Chekhov, an actor/model concurrency framework for Rust.
 //
-// Chekhov is free software; you can redistribute it and/or modify it under the terms of the Lesser
-// GNU General Public License as published by the Free Software Foundation, either version 3 of the
+// Chekhov is free software; you can redistribute it and/or modify it under the terms of the GNU
+// General Public License as published by the Free Software Foundation, either version 3 of the
 // License or (at your option) any later version.
 //
 // Chekhov is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
 // even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-// Lesser General Public License for more details.
+// General Public License for more details.
 //
-// You should have received a copy of the GNU Lesser General Public License along with Chekhov. If
-// not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License along with Chekhov. If not see
+// <https://www.gnu.org/licenses/>.
 
 #![macro_use]
 
@@ -18,7 +18,7 @@ macro_rules! actor_mut {
     {$actor:ident ($( $arg:ident : $t:ty ),*) :: $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>, $( $t, )*)
-                        -> Result<(), $crate::CueError> + Send>,
+                        -> Result<(), $crate::ActorError> + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,
             $( $arg: $t, )*
         }
@@ -43,10 +43,10 @@ macro_rules! actor_mut {
     };
     {$actor:ident ($( $arg:ident : $t:ty ),*) => $script:expr} => {
         struct $actor {
-            func: Box<::std::boxed::FnBox($( $t, )*) -> Result<(), $crate::CueError> + Send>,
+            func: Box<::std::boxed::FnBox($( $t, )*) -> Result<(), $crate::ActorError> + Send>,
             $( $arg : $t, )*
         }
-        #[allow(unused_mut)]
+        #[allow(unused_mut, unreachable_code)]
         impl $actor {
             fn new($( $arg: $t, )*) -> Box<$crate::IsolatedActor<$actor>> {
                 Box::new($crate::IsolatedActor::new($actor {
@@ -68,7 +68,7 @@ macro_rules! actor {
     {$actor:ident ($( $arg:ident : $t:ty ),*) :: $binding:ident : $reads:ty => $script:expr} => {
         struct $actor {
             func: Box<::std::boxed::FnBox(::std::sync::mpsc::Receiver<$reads>, $( $t, )*) 
-                        -> Result<(), $crate::CueError> + Send>,
+                        -> Result<(), $crate::ActorError> + Send>,
             rx: ::std::sync::mpsc::Receiver<$reads>,
             $( $arg: $t, )*
         }
@@ -92,9 +92,10 @@ macro_rules! actor {
     };
     {$actor:ident ($( $arg:ident : $t:ty ),*) => $script:expr} => {
         struct $actor {
-            func: Box<::std::boxed::FnBox($( $t, )*) -> $crate::CueError + Send>,
+            func: Box<::std::boxed::FnBox($( $t, )*) -> Result<(), $crate::ActorError> + Send>,
             $( $arg : $t, )*
         }
+        #[allow(unreachable_code)]
         impl $actor {
             fn new($( $arg: $t, )*) -> Box<$crate::IsolatedActor<$actor>> {
                 Box::new($crate::IsolatedActor::new($actor {
@@ -109,4 +110,11 @@ macro_rules! actor {
             }
         }
     };
+}
+
+
+#[macro_use]
+macro_rules! break_a_leg {
+    () => ( return Ok(()); );
+    ($log:expr) => ( return ActorError::Internal(($log).to_string()) );
 }
