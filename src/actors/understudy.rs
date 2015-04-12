@@ -12,61 +12,70 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::iter::Unfold;
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::{Actor, Cueable, ActorError};
+use super::{Actor, ActorError, Cueable, Telegram, Null};
 
-pub struct Understudy<T: Send>(Sender<T>, Receiver<T>);
+pub struct Understudy<M: Send + 'static> {
+    tx: Sender<Telegram<M>>,
+    rx: Receiver<Telegram<M>>
+}
 
-impl<T: Send> Understudy<T> {
+impl<M: Send> Understudy<M> {
 
-    pub fn new() -> Understudy<T> {
+    pub fn new() -> Understudy<M> {
         let (tx, rx) = channel();
-        Understudy(tx, rx)
+        Understudy { tx: tx, rx: rx }
     }
 
-    pub fn stage(&self) -> Actor<T> {
-        Actor(self.0.clone())
-    }
-
-    pub fn read(&mut self) -> Vec<T> {
-        Unfold::new(&mut self.1, |tx| tx.try_recv().ok())
+    pub fn read(&mut self) -> Vec<M> {
+        Unfold::new(&mut self.rx, |rx| rx.try_recv().map(|gram| gram.0).ok())
                .collect::<Vec<_>>()
     }
     
-    pub fn read_all(self) -> Vec<T> {
-        drop(self.0);
-        self.1.iter().collect::<Vec<_>>()
+    pub fn read_all(self) -> Vec<M> {
+        drop(self.tx);
+        self.rx.iter().map(|gram| gram.0).collect::<Vec<_>>()
+    }
+    
+    pub fn stage(&self) -> Actor<M, Null> {
+        Actor {
+            tx: self.tx.clone(),
+            tag: 0,
+            head_count: Arc::new(Mutex::new(0)),
+            phantom: PhantomData,
+        }
     }
 
 }
 
-impl<T: Send> Cueable for Understudy<T> {
-    type Message = T;
+impl<M: Send> Cueable for Understudy<M> {
+    type Message = M;
 
-    fn cue(&self, data: T) -> Result<(), ActorError> {
-        self.0.send(data).map_err(|_| ActorError::CueError)
+    fn cue(&self, data: M) -> Result<(), ActorError> {
+        self.tx.send(Telegram(data, 0)).map_err(|_| ActorError::CueError)
     }
 
 }
-
 
 #[cfg(test)]
 mod tests {
 
-    use types::*;
+    use actors::*;
 
     actor!{ Fount5(next: Actor<u8>) => {
-        for i in 1..5 { try!(next.cue(i)) }
+        for i in 0..5 { try!(next.cue(i)) }
         break_a_leg!();
     }}
 
     #[test]
     fn it_collects_messages_sent_to_it() {
         let next = super::Understudy::new();
-        let fount = Fount5::new(next.stage());
+        let fount = Fount5::new(next.stage().unwrap());
         fount.action();
-        assert_eq!(next.read_all(), vec![1, 2, 3, 4]);
+        assert_eq!(next.read_all(), vec![0,1,2,3,4]);
     }
 
     #[test]

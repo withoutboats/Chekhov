@@ -12,7 +12,7 @@
 // <https://www.gnu.org/licenses/>.
 
 #![macro_use]
-#![feature(core)]
+#![feature(core, concat_idents)]
 
 //! Chekhov is an actor/model concurrency framework for Rust. Because of its heavy reliance on
 //! macros, formatting rust docs is tricky, so for now I've just dumped a bunch of markdown in the
@@ -70,12 +70,12 @@
 //!
 //! ```
 //! #![feature(core)]
-//! # #[macro_use(actor_mut)]
+//! # #[macro_use(actor)]
 //! # extern crate chekhov;
 //! # use std::io;
 //! # use std::io::Write;
 //! # use chekhov::*;
-//! actor_mut!{ EnumeratedReader(next: Actor<String>, x: u32) => {
+//! actor!{ EnumeratedReader(next: Actor<String>, x: u32) => {
 //!     print!("{}. ", x);
 //!     io::stdout().flush().ok();
 //!     x += 1;
@@ -139,7 +139,7 @@
 //!     println!("{}", prefix.clone() + &msg);
 //! }}
 //! 
-//! actor_mut!{ EnumeratedReader(next: Actor<String>, x: u32) => {
+//! actor!{ EnumeratedReader(next: Actor<String>, x: u32) => {
 //!     print!("{}. ", x);
 //!     io::stdout().flush().ok();
 //!     x += 1;
@@ -156,16 +156,10 @@
 //! }
 //! ```
 
-use std::thread;
+mod actor_macro;
+mod assist;
 
-mod macros;
-pub mod types;
+pub use assist::*;
+pub mod actors;
+pub use actors::*;
 
-pub use types::*;
-
-pub fn from_the_top(actors: Vec<Box<Actionable>>) {
-    for actor in actors {
-        actor.action();
-    }
-    thread::park();
-}
