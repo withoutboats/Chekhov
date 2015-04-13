@@ -13,16 +13,6 @@
 
 #![macro_use]
 
-use std::thread;
-use actors::Scenic;
-
-pub fn from_the_top(scenes: Vec<Box<Scenic>>) {
-    for scene in scenes {
-        scene.action();
-    }
-    thread::park();
-}
-
 #[macro_export]
 macro_rules! break_a_leg {
     () => ( return Ok(()); );

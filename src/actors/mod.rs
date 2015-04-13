@@ -12,70 +12,80 @@
 // <https://www.gnu.org/licenses/>.
 
 pub mod understudy;
-pub mod scene;
 
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 
 pub use self::understudy::Understudy;
-pub use self::scene::{Scene, Scenic};
-
-pub struct Telegram<M: Send + 'static>(pub M, pub u32);
 
 pub struct Null;
+
+pub type Actor<M> = Box<Cueable<Message=M>>;
+
+pub trait Cueable: Send {
+    type Message: Send + 'static;
+    fn cue(&self, msg: Self::Message) -> Result<(), ActorError>;
+}
+
+#[derive(Clone)]
+pub struct ActorStruct<M: Send + 'static>(Sender<M>);
+
+impl<M: Send + 'static> ActorStruct<M> {
+    pub fn new(tx: Sender<M>) -> Actor<M> {
+        Box::new(ActorStruct(tx))
+    }
+}
+
+impl<M: Send + 'static> Cueable for ActorStruct<M> {
+    type Message = M;
+    fn cue(&self, msg: M) -> Result<(), ActorError> {
+        self.0.send(msg).map_err(|_| ActorError::CueError)
+    }
+}
+
+pub struct ActorStructMut<M: Send + 'static>(Sender<M>);
+
+impl<M: Send + 'static> ActorStructMut<M> {
+    pub fn new(tx: Sender<M>) -> Actor<M> {
+        Box::new(ActorStruct(tx))
+    }
+}
+
+impl<M: Send + 'static> Cueable for ActorStructMut<M> {
+    type Message = M;
+    fn cue(&self, msg: M) -> Result<(), ActorError> {
+        self.0.send(msg).map_err(|_| ActorError::CueError)
+    }
+}
 
 pub enum ActorError {
     CueError,
     Internal(String),
 }
 
-pub trait Cueable {
-    type Message: Send;
-    fn cue(&self, msg: Self::Message) -> Result<(), ActorError>;
-}
+#[cfg(test)]
+mod tests {
 
-pub struct Actor<M: Send + 'static, A: Send + 'static> {
-    tx: Sender<Telegram<M>>,
-    tag: u32,
-    head_count: Arc<Mutex<u32>>,
-    phantom: PhantomData<*const A>,
-}
+    use actors::*;
 
-impl<M: Send, A: Send> Actor<M, A> {
+    actor!{ Generator(x: u8, next: Actor<u8>) => {
+        try!(next.cue(x));
+    }}  
 
-    pub fn new(tx: Sender<Telegram<M>>) -> Actor<M, A> {
-        Actor {
-            tx: tx,
-            tag: 0,
-            head_count: Arc::new(Mutex::new(0)),
-            phantom: PhantomData
-        }
-    }
-}
+    actor_mut!{ Summer(x: u8, next: Actor<u8>) :: msg: u8 => {
+        x += msg;
+        try!(next.cue(x));
+        if x == 5 { break_a_leg!(); }
+    }}
+    
+    actor!{ Doubler(next: Actor<u8>) :: msg: u8 => {
+        try!(next.cue(msg * 2));
+    }}
 
-impl<M: Send, A: Send> Cueable for Actor<M, A> {
-    type Message = M;
-
-    fn cue(&self, data: M) -> Result<(), ActorError> {
-        self.tx.send(Telegram(data, self.tag)).map_err(|_| ActorError::CueError)
+    #[test]
+    fn actors_work() {
+        let understudy = Understudy::new();
+        Generator::new(1, Summer::new(0, Doubler::new(understudy.stage())));
+        assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
     }
 
-}
-
-impl<M: Send, A: Send> Clone for Actor<M, A> where A: Clone {
-    fn clone(&self) -> Actor<M, A> {
-        let tag;
-        {
-            let mut n = self.head_count.lock().unwrap();
-            *n += 1;
-            tag = *n;
-        }
-        Actor {
-            tx: self.tx.clone(),
-            tag: tag,
-            head_count: self.head_count.clone(),
-            phantom: PhantomData,
-        }
-    }
 }

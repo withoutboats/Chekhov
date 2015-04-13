@@ -12,50 +12,40 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::iter::Unfold;
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::{Actor, ActorError, Cueable, Telegram, Null};
+use super::{Actor, ActorStruct, ActorError, Cueable};
 
-pub struct Understudy<M: Send + 'static> {
-    tx: Sender<Telegram<M>>,
-    rx: Receiver<Telegram<M>>
-}
+pub struct Understudy<M: Send + 'static>(Sender<M>, Receiver<M>);
 
-impl<M: Send> Understudy<M> {
+impl<M: Send + 'static> Understudy<M> {
 
-    pub fn new() -> Understudy<M> {
+    pub fn new() -> Box<Understudy<M>> {
         let (tx, rx) = channel();
-        Understudy { tx: tx, rx: rx }
+        Box::new(Understudy(tx, rx))
     }
 
     pub fn read(&mut self) -> Vec<M> {
-        Unfold::new(&mut self.rx, |rx| rx.try_recv().map(|gram| gram.0).ok())
+        Unfold::new(&mut self.1, |rx| rx.try_recv().ok())
                .collect::<Vec<_>>()
     }
     
     pub fn read_all(self) -> Vec<M> {
-        drop(self.tx);
-        self.rx.iter().map(|gram| gram.0).collect::<Vec<_>>()
+        drop(self.0);
+        self.1.iter().collect::<Vec<_>>()
     }
     
-    pub fn stage(&self) -> Actor<M, Null> {
-        Actor {
-            tx: self.tx.clone(),
-            tag: 0,
-            head_count: Arc::new(Mutex::new(0)),
-            phantom: PhantomData,
-        }
+    pub fn stage(&self) -> Actor<M> {
+        ActorStruct::new(self.0.clone())
     }
 
 }
 
-impl<M: Send> Cueable for Understudy<M> {
+impl<M: Send + 'static> Cueable for Understudy<M> {
     type Message = M;
 
-    fn cue(&self, data: M) -> Result<(), ActorError> {
-        self.tx.send(Telegram(data, 0)).map_err(|_| ActorError::CueError)
+    fn cue(&self, msg: M) -> Result<(), ActorError> {
+        self.0.send(msg).map_err(|_| ActorError::CueError)
     }
 
 }
@@ -72,16 +62,15 @@ mod tests {
 
     #[test]
     fn it_collects_messages_sent_to_it() {
-        let next = super::Understudy::new();
-        let fount = Fount5::new(next.stage().unwrap());
-        fount.action();
-        assert_eq!(next.read_all(), vec![0,1,2,3,4]);
+        let understudy = super::Understudy::new();
+        Fount5::new(understudy.stage());
+        assert_eq!(understudy.read_all(), vec![0,1,2,3,4]);
     }
 
     #[test]
     fn it_can_be_cued_directly() {
-        let understudy: Understudy<u8> = super::Understudy::new();
-        assert!(understudy.cue(0).is_ok());
+        let understudy = super::Understudy::new();
+        assert!(understudy.cue(0u8).is_ok());
         assert_eq!(understudy.read_all(), vec![0]);
     }
 
