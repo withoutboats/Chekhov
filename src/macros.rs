@@ -21,7 +21,7 @@ macro_rules! actor {
         #[allow(unused_mut, unreachable_code)]
         impl $actor {
             pub fn new($( $arg: $t, )*) -> $crate::Actor<$reads> {
-                let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel();
+                let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel::<$reads>();
                 let __chek_script = move |$( $arg: $t, )*| -> Result<(), $crate::ActorError> {
                     while let Ok($msg) = __chek_rx.recv() { $script }
                     Ok(())

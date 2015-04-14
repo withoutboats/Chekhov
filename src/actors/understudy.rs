@@ -11,7 +11,6 @@
 // You should have received a copy of the GNU General Public License along with Chekhov. If not see
 // <https://www.gnu.org/licenses/>.
 
-use std::iter::Unfold;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
 use super::{Actor, ActorStruct, ActorError, Cueable};
@@ -25,9 +24,10 @@ impl<M: Send + 'static> Understudy<M> {
         Box::new(Understudy(tx, rx))
     }
 
-    pub fn read(&mut self) -> Vec<M> {
-        Unfold::new(&mut self.1, |rx| rx.try_recv().ok())
-               .collect::<Vec<_>>()
+    pub fn read(&self) -> Vec<M> {
+        let mut out = Vec::new();
+        while let Ok(data) = self.1.try_recv() { out.push(data); }
+        out
     }
     
     pub fn read_all(self) -> Vec<M> {
