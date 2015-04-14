@@ -35,10 +35,6 @@ impl<M: Send + 'static> Understudy<M> {
         self.1.iter().collect::<Vec<_>>()
     }
     
-    pub fn stage(&self) -> Actor<M> {
-        ActorStruct::new(self.0.clone())
-    }
-
 }
 
 impl<M: Send + 'static> Cueable for Understudy<M> {
@@ -46,6 +42,10 @@ impl<M: Send + 'static> Cueable for Understudy<M> {
 
     fn cue(&self, msg: M) -> Result<(), ActorError> {
         self.0.send(msg).map_err(|_| ActorError::CueError)
+    }
+
+    fn stage(&self) -> Option<Actor<M>> {
+        Some(ActorStruct::new(self.0.clone()))
     }
 
 }
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn it_collects_messages_sent_to_it() {
         let understudy = super::Understudy::new();
-        Fount5::new(understudy.stage());
+        Fount5::new(understudy.stage().unwrap());
         assert_eq!(understudy.read_all(), vec![0,1,2,3,4]);
     }
 

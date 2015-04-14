@@ -24,6 +24,7 @@ pub type Actor<M> = Box<Cueable<Message=M>>;
 pub trait Cueable: Send {
     type Message: Send + 'static;
     fn cue(&self, msg: Self::Message) -> Result<(), ActorError>;
+    fn stage(&self) -> Option<Actor<Self::Message>>;
 }
 
 #[derive(Clone)]
@@ -40,13 +41,16 @@ impl<M: Send + 'static> Cueable for ActorStruct<M> {
     fn cue(&self, msg: M) -> Result<(), ActorError> {
         self.0.send(msg).map_err(|_| ActorError::CueError)
     }
+    fn stage(&self) -> Option<Actor<M>> {
+        Some(Self::new(self.0.clone()))
+    }
 }
 
 pub struct ActorStructMut<M: Send + 'static>(Sender<M>);
 
 impl<M: Send + 'static> ActorStructMut<M> {
     pub fn new(tx: Sender<M>) -> Actor<M> {
-        Box::new(ActorStruct(tx))
+        Box::new(ActorStructMut(tx))
     }
 }
 
@@ -55,6 +59,7 @@ impl<M: Send + 'static> Cueable for ActorStructMut<M> {
     fn cue(&self, msg: M) -> Result<(), ActorError> {
         self.0.send(msg).map_err(|_| ActorError::CueError)
     }
+    fn stage(&self) -> Option<Actor<M>> { None }
 }
 
 pub enum ActorError {
@@ -84,8 +89,15 @@ mod tests {
     #[test]
     fn actors_work() {
         let understudy = Understudy::new();
-        Generator::new(1, Summer::new(0, Doubler::new(understudy.stage())));
+        Generator::new(1, Summer::new(0, Doubler::new(understudy.stage().unwrap())));
         assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn actor_mut_wont_clone() {
+        let actor = Summer::new(0, Understudy::new().stage().unwrap());
+        actor.stage().unwrap();
     }
 
 }
