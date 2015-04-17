@@ -14,24 +14,26 @@ no documentation yet, but here's an example:
 #[macro_use]
 extern crate chekhov;
 
+use std::fmt::Display;
 use std::io;
+
+use chekhov::*;
 
 fn print_prefixed<T: Display>(msg: T, prefix: &str) -> Result<(), ActorError> {
     println!("{}{}", prefix, msg);
+    Ok(())
 } 
 
-fn read_input(next: ::chekhov::Actor<String>) -> Result<(), ActorError> {
-    while true {
-        let mut buf = String::new();
-        if io::stdin().read_line(&mut buf).is_ok() {
-            try!(next.cue(buf));
-        }
-    }
+fn read_input(next: &Actor<String>) -> Result<(), ActorError> {
+    let mut buffer = String::new();
+    if io::stdin().read_line(&mut buf).is_ok() {
+        next.cue(buffer)
+    } else { ActorError::Internal("Could not read from stdin.".to_string()) }
 }
 
 fn main() {
-    let printer = actor!(print_prefixed, ">>> ");
-    read_input(printer.stage().unwrap()).ok();
+    let printer = actor!(print_prefixed, prefix=">>> ");
+    actor_loop!(read_input, next=printer);
 }
 ```
 
