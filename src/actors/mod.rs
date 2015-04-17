@@ -100,16 +100,14 @@ mod tests {
     #[test]
     fn actors_work() {
         let understudy = Understudy::new();
-        actor_loop!(generate, x=1,
-                    next=actor_mut!(sum, x=0,
-                                    next=actor!(double, next=understudy.stage().unwrap())));
+        actor_loop!(generate, 1, actor_mut!(sum, 0, actor!(double, understudy.stage().unwrap())));
         assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
     }
 
     #[test]
     #[should_panic]
     fn actor_mut_wont_clone() {
-        let actor = actor_mut!(sum, x=0, next=Understudy::new().stage().unwrap());
+        let actor = actor_mut!(sum, 0, Understudy::new().stage().unwrap());
         actor.stage().unwrap();
     }
 

@@ -32,8 +32,8 @@ fn read_input(next: &Actor<String>) -> Result<(), ActorError> {
 }
 
 fn main() {
-    let printer = actor!(print_prefixed, prefix=">>> ");
-    actor_loop!(read_input, next=printer);
+    let printer = actor!(print_prefixed, ">>> ");
+    actor_loop!(read_input, printer);
 }
 ```
 

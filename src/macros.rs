@@ -15,46 +15,42 @@
 
 #[macro_export]
 macro_rules! actor {
-    ($script:expr, $($bind:ident=$val:expr),*) => ({
-        $( let $bind = $val; )*
-        let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel();
-        ::std::thread::spawn(move || {
-            while let Ok(__chek_msg) = __chek_rx.recv() {
-                if let Err(_) = $script(__chek_msg, $( &$bind, )*) {
-                    break;
-                }
-            }
-        });
-        $crate::ActorStruct::new(__chek_tx)
-    });
+    ($script:expr, $($e:expr),*) => { actor_expand!(actor $script => ($($e,)*), ()) }
 }
 
 #[macro_export]
 macro_rules! actor_mut {
-    ($script:expr, $($bind:ident=$val:expr),*) => ({
-        $( let mut $bind = $val; )*
-        let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel();
-        ::std::thread::spawn(move || {
-            while let Ok(__chek_msg) = __chek_rx.recv() {
-                if let Err(_) = $script(__chek_msg, $( &mut $bind, )*) {
-                    break;
-                }
-            }
-        });
-        $crate::ActorStructMut::new(__chek_tx)
-    });
+    ($script:expr, $($e:expr),*) => { actor_expand!(actor_mut $script => ($($e,)*), ()) }
 }
 
 #[macro_export]
 macro_rules! actor_loop {
-    ($script:expr, $($bind:ident=$val:expr),*) => ({
-        $( let mut $bind = $val; )*
-        ::std::thread::spawn(move || {
-            loop {
-                if let Err(_) = $script($( &mut $bind, )*) {
-                    break;
-                }
-            }
+    ($script:expr, $($e:expr),*) => { actor_expand!(actor_loop $script => ($($e,)*), ()) }
+}
+
+#[macro_export]
+macro_rules! actor_expand {
+    ($kind:ident $script:expr => ($head:expr, $($rest:expr,)*), ($($bound:ident),*)) => ({
+        let mut binding = $head;
+        actor_expand!($kind $script => ($($rest,)*), ($($bound,)* binding))
+    });
+    (actor $script:expr => (), ($($bound:ident),*)) => ({
+        let (tx, rx) = ::std::sync::mpsc::channel();
+        ::std::thread::spawn(move || while let Ok(msg) = rx.recv() {
+            if $script(msg, $( &$bound, )*).is_err() { break; }
+        });
+        ActorStruct::new(tx)
+    });
+    (actor_mut $script:expr => (), ($($bound:ident),*)) => ({
+        let (tx, rx) = ::std::sync::mpsc::channel();
+        ::std::thread::spawn(move || while let Ok(msg) = rx.recv() {
+            if $script(msg, $( &mut $bound, )*).is_err() { break; }
+        });
+        ActorStructMut::new(tx)
+    });
+    (actor_loop $script:expr => (), ($($bound:ident),*)) => ({
+        ::std::thread::spawn(move || loop {
+            if $script($( &mut $bound, )*).is_err() { break; }
         });
     });
 }
