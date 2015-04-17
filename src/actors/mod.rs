@@ -85,7 +85,7 @@ mod tests {
         Ok(())
     }
 
-    fn sum(msg: u8, x: &mut u8, next: &mut Actor<u8>) -> Result<(), ActorError> {
+    fn sum(msg: u8, x: &mut u8, next: &Actor<u8>) -> Result<(), ActorError> {
         *x += msg;
         try!(next.cue(*x));
         if *x == 5 { Err(ActorError::Finished) }

@@ -31,7 +31,7 @@ macro_rules! actor_loop {
 #[macro_export]
 macro_rules! actor_expand {
     ($kind:ident $script:expr => ($head:expr, $($rest:expr,)*), ($($bound:ident),*)) => ({
-        let mut binding = $head;
+        let binding = $head;
         actor_expand!($kind $script => ($($rest,)*), ($($bound,)* binding))
     });
     (actor $script:expr => (), ($($bound:ident),*)) => ({
@@ -42,6 +42,7 @@ macro_rules! actor_expand {
         ActorStruct::new(tx)
     });
     (actor_mut $script:expr => (), ($($bound:ident),*)) => ({
+        $(let mut $bound = $bound;)*
         let (tx, rx) = ::std::sync::mpsc::channel();
         ::std::thread::spawn(move || while let Ok(msg) = rx.recv() {
             if $script(msg, $( &mut $bound, )*).is_err() { break; }
@@ -49,6 +50,7 @@ macro_rules! actor_expand {
         ActorStructMut::new(tx)
     });
     (actor_loop $script:expr => (), ($($bound:ident),*)) => ({
+        $(let mut $bound = $bound;)*
         ::std::thread::spawn(move || loop {
             if $script($( &mut $bound, )*).is_err() { break; }
         });
