@@ -17,26 +17,26 @@
 //! #[macro_use]
 //! extern crate chekhov;
 //! 
+//! use std::fmt::Display;
 //! use std::io;
-//! use std::io::Write;
-//! 
-//! actor!{ PrefixedPrinter(prefix: String) :: msg: String => {
-//!     println!("{}", prefix.clone() + &msg);
-//! }}
-//! 
-//! actor_mut!{ EnumeratedReader(next: ::chekhov::Actor<String>, x: u32) => {
-//!     print!("{}. ", x);
-//!     io::stdout().flush().ok();
-//!     x += 1;
+//!
+//! use chekhov::*;
+//!
+//! fn print_prefixed<T: Display>(msg: T, prefix: &str) -> Result<(), ActorError> {
+//!     println!("{}{}", prefix, msg);
+//!     Ok(())
+//! }
+//!
+//! fn read_input(next: &Actor<String>) -> Result<(), ActorError> {
 //!     let mut buffer = String::new();
 //!     if io::stdin().read_line(&mut buffer).is_ok() {
-//!         try!(next.cue(buffer));
-//!     }
-//! }}
+//!         next.cue(buffer)
+//!     } else { Err(ActorError::Internal("Could not read from stdin.".to_string())) }
+//! }
 //! 
 //! fn main() {
-//!     let printer = PrefixedPrinter::new(">>> ".to_string());
-//!     let reader = EnumeratedReader::new(printer, 1);
+//!     let printer = actor!(print_prefixed, prefix=">>> ");
+//!     actor_loop!(read_input, next=printer);
 //! }
 //! ```
 

@@ -13,7 +13,7 @@
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::{Actor, ActorStruct, ActorError, Cueable};
+use super::{Actor, ActorStruct, ActorError, Cued};
 
 pub struct Understudy<M: Send + 'static>(Sender<M>, Receiver<M>);
 
@@ -37,7 +37,7 @@ impl<M: Send + 'static> Understudy<M> {
     
 }
 
-impl<M: Send + 'static> Cueable for Understudy<M> {
+impl<M: Send + 'static> Cued for Understudy<M> {
     type Message = M;
 
     fn cue(&self, msg: M) -> Result<(), ActorError> {
@@ -55,15 +55,14 @@ mod tests {
 
     use actors::*;
 
-    actor!{ Fount5(next: Actor<u8>) => {
-        for i in 0..5 { try!(next.cue(i)) }
-        break_a_leg!();
-    }}
+    fn fountain_5(next: Actor<u8>) {
+        for i in 0..5 { next.cue(i).ok(); }
+    }
 
     #[test]
     fn it_collects_messages_sent_to_it() {
         let understudy = super::Understudy::new();
-        Fount5::new(understudy.stage().unwrap());
+        fountain_5(understudy.stage().unwrap());
         assert_eq!(understudy.read_all(), vec![0,1,2,3,4]);
     }
 

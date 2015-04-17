@@ -15,25 +15,23 @@ no documentation yet, but here's an example:
 extern crate chekhov;
 
 use std::io;
-use std::io::Write;
 
-actor!{ PrefixedPrinter(prefix: String) :: msg: String => {
-    println!("{}", prefix.clone() + &msg);
-}}
+fn print_prefixed<T: Display>(msg: T, prefix: &str) -> Result<(), ActorError> {
+    println!("{}{}", prefix, msg);
+} 
 
-actor_mut!{ EnumeratedReader(next: ::chekhov::Actor<String>, x: u32) => {
-    print!("{}. ", x);
-    io::stdout().flush().ok();
-    x += 1;
-    let mut buffer = String::new();
-    if io::stdin().read_line(&mut buffer).is_ok() {
-        try!(next.cue(buffer));
+fn read_input(next: ::chekhov::Actor<String>) -> Result<(), ActorError> {
+    while true {
+        let mut buf = String::new();
+        if io::stdin().read_line(&mut buf).is_ok() {
+            try!(next.cue(buf));
+        }
     }
-}}
+}
 
 fn main() {
-    let printer = PrefixedPrinter::new(">>> ".to_string());
-    let reader = EnumeratedReader::new(printer, 1);
+    let printer = actor!(print_prefixed, ">>> ");
+    read_input(printer.stage().unwrap()).ok();
 }
 ```
 

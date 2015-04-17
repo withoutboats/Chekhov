@@ -19,12 +19,19 @@ pub use self::understudy::Understudy;
 
 pub struct Null;
 
-pub type Actor<M> = Box<Cueable<Message=M>>;
+pub type Actor<M> = Box<Cued<Message=M>>;
 
-pub trait Cueable: Send {
+pub trait Cued: Send {
     type Message: Send + 'static;
     fn cue(&self, msg: Self::Message) -> Result<(), ActorError>;
     fn stage(&self) -> Option<Actor<Self::Message>>;
+}
+
+pub trait Directed {
+    type State: Send + 'static;
+    fn action(&self) -> Result<(), ActorError>;
+    fn cut(&self) -> Result<Self::State, ActorError>;
+    fn fin(&self) -> Result<Self::State, ActorError>;
 }
 
 #[derive(Clone)]
@@ -36,7 +43,7 @@ impl<M: Send + 'static> ActorStruct<M> {
     }
 }
 
-impl<M: Send + 'static> Cueable for ActorStruct<M> {
+impl<M: Send + 'static> Cued for ActorStruct<M> {
     type Message = M;
     fn cue(&self, msg: M) -> Result<(), ActorError> {
         self.0.send(msg).map_err(|_| ActorError::CueError)
@@ -54,7 +61,7 @@ impl<M: Send + 'static> ActorStructMut<M> {
     }
 }
 
-impl<M: Send + 'static> Cueable for ActorStructMut<M> {
+impl<M: Send + 'static> Cued for ActorStructMut<M> {
     type Message = M;
     fn cue(&self, msg: M) -> Result<(), ActorError> {
         self.0.send(msg).map_err(|_| ActorError::CueError)
@@ -65,6 +72,7 @@ impl<M: Send + 'static> Cueable for ActorStructMut<M> {
 pub enum ActorError {
     CueError,
     Internal(String),
+    Finished,
 }
 
 #[cfg(test)]
@@ -72,31 +80,36 @@ mod tests {
 
     use actors::*;
 
-    actor!{ Generator(x: u8, next: Actor<u8>) => {
-        try!(next.cue(x));
-    }}  
+    fn generate(x: &u8, next: &Actor<u8>) -> Result<(), ActorError> {
+        try!(next.cue(*x));
+        Ok(())
+    }
 
-    actor_mut!{ Summer(x: u8, next: Actor<u8>) :: msg: u8 => {
-        x += msg;
-        try!(next.cue(x));
-        if x == 5 { break_a_leg!(); }
-    }}
+    fn sum(msg: u8, x: &mut u8, next: &mut Actor<u8>) -> Result<(), ActorError> {
+        *x += msg;
+        try!(next.cue(*x));
+        if *x == 5 { Err(ActorError::Finished) }
+        else { Ok(()) }
+    }
     
-    actor!{ Doubler(next: Actor<u8>) :: msg: u8 => {
+    fn double(msg: u8, next: &Actor<u8>) -> Result<(), ActorError> {
         try!(next.cue(msg * 2));
-    }}
+        Ok(())
+    }
 
     #[test]
     fn actors_work() {
         let understudy = Understudy::new();
-        Generator::new(1, Summer::new(0, Doubler::new(understudy.stage().unwrap())));
+        actor_loop!(generate, x=1,
+                    next=actor_mut!(sum, x=0,
+                                    next=actor!(double, next=understudy.stage().unwrap())));
         assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
     }
 
     #[test]
     #[should_panic]
     fn actor_mut_wont_clone() {
-        let actor = Summer::new(0, Understudy::new().stage().unwrap());
+        let actor = actor_mut!(sum, x=0, next=Understudy::new().stage().unwrap());
         actor.stage().unwrap();
     }
 

@@ -15,68 +15,46 @@
 
 #[macro_export]
 macro_rules! actor {
-    { $actor:ident ($( $arg:ident : $t:ty ),*) :: $msg:ident : $reads:ty => $script:block }
-    => {
-        pub struct $actor;
-        #[allow(unused_mut, unreachable_code)]
-        impl $actor {
-            pub fn new($( $arg: $t, )*) -> $crate::Actor<$reads> {
-                let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel::<$reads>();
-                let __chek_script = move |$( $arg: $t, )*| -> Result<(), $crate::ActorError> {
-                    while let Ok($msg) = __chek_rx.recv() { $script }
-                    Ok(())
-                };
-                ::std::thread::spawn(move || { __chek_script($( $arg, )*).ok(); });
-                $crate::ActorStruct::new(__chek_tx)
+    ($script:expr, $($bind:ident=$val:expr),*) => ({
+        $( let $bind = $val; )*
+        let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel();
+        ::std::thread::spawn(move || {
+            while let Ok(__chek_msg) = __chek_rx.recv() {
+                if let Err(_) = $script(__chek_msg, $( &$bind, )*) {
+                    break;
+                }
             }
-        }
-    };
-    { $actor:ident ($( $arg:ident : $t:ty ),*) => $script:block }
-    => {
-        pub struct $actor;
-        #[allow(unused_mut, unreachable_code)]
-        impl $actor {
-            pub fn new($( $arg: $t, )*) {
-                let __chek_script = move |$( $arg: $t, )*| -> Result<(), $crate::ActorError> {
-                    loop { $script }
-                    Ok(())
-                };
-                ::std::thread::spawn(move || { __chek_script($( $arg, )*).ok(); });
-            }
-        }
-    };
+        });
+        $crate::ActorStruct::new(__chek_tx)
+    });
 }
 
 #[macro_export]
 macro_rules! actor_mut {
-    { $actor:ident ($( $arg:ident : $t:ty ),*) :: $msg:ident : $reads:ty => $script:block }
-    => {
-        pub struct $actor;
-        #[allow(unused_mut, unreachable_code)]
-        impl $actor {
-            pub fn new($( mut $arg: $t, )*) -> $crate::Actor<$reads> {
-                let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel::<$reads>();
-                let __chek_script = move |$( mut $arg: $t, )*| -> Result<(), $crate::ActorError> {
-                    while let Ok($msg) = __chek_rx.recv() { $script }
-                    Ok(())
-                };
-                ::std::thread::spawn(move || { __chek_script($( $arg, )*).ok(); });
-                $crate::ActorStructMut::new(__chek_tx)
+    ($script:expr, $($bind:ident=$val:expr),*) => ({
+        $( let mut $bind = $val; )*
+        let (__chek_tx, __chek_rx) = ::std::sync::mpsc::channel();
+        ::std::thread::spawn(move || {
+            while let Ok(__chek_msg) = __chek_rx.recv() {
+                if let Err(_) = $script(__chek_msg, $( &mut $bind, )*) {
+                    break;
+                }
             }
-        }
-    };
-    { $actor:ident ($( $arg:ident : $t:ty ),*) => $script:block }
-    => {
-        pub struct $actor;
-        #[allow(unused_mut, unreachable_code)]
-        impl $actor {
-            pub fn new($( mut $arg: $t, )*) {
-                let __chek_script = move |$( mut $arg: $t, )*| -> Result<(), $crate::ActorError> {
-                    loop { $script }
-                    Ok(())
-                };
-                ::std::thread::spawn(move || { __chek_script($( $arg, )*).ok(); });
+        });
+        $crate::ActorStructMut::new(__chek_tx)
+    });
+}
+
+#[macro_export]
+macro_rules! actor_loop {
+    ($script:expr, $($bind:ident=$val:expr),*) => ({
+        $( let mut $bind = $val; )*
+        ::std::thread::spawn(move || {
+            loop {
+                if let Err(_) = $script($( &mut $bind, )*) {
+                    break;
+                }
             }
-        }
-    };
+        });
+    });
 }
