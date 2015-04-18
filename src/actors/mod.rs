@@ -13,60 +13,80 @@
 
 pub mod understudy;
 
+use std::iter::IntoIterator;
 use std::sync::mpsc::Sender;
 
 pub use self::understudy::Understudy;
 
-pub struct Null;
+pub type ActorResult = Result<(), ActorError>;
 
-pub type Actor<M> = Box<Cued<Message=M>>;
-
-pub trait Cued: Send {
-    type Message: Send + 'static;
-    fn cue(&self, msg: Self::Message) -> Result<(), ActorError>;
-    fn stage(&self) -> Option<Actor<Self::Message>>;
+pub trait Actor<M: Send + 'static>: Send {
+    fn cue(&self, msg: M) -> ActorResult;
+    fn cut(&self) -> ActorResult;
+    fn stage(&self) -> Option<ActorStruct<M>>;
+    
+    fn cue_all<I: IntoIterator<Item=M>>(&self, iterable: I) -> ActorResult {
+        for msg in iterable { try!(self.cue(msg)); }
+        Ok(())
+    }
 }
 
-pub trait Directed {
-    type State: Send + 'static;
-    fn action(&self) -> Result<(), ActorError>;
-    fn cut(&self) -> Result<Self::State, ActorError>;
-    fn fin(&self) -> Result<Self::State, ActorError>;
+pub enum Message<M: Send + 'static> {
+    Cue(M), Cut,
+}
+
+impl<M: Send + 'static> Into<Option<M>> for Message<M> {
+    fn into(self) -> Option<M> {
+        match self {
+            Message::Cue(data) => Some(data),
+            Message::Cut       => None,
+        }
+    }
 }
 
 #[derive(Clone)]
-pub struct ActorStruct<M: Send + 'static>(Sender<M>);
+pub struct ActorStruct<M: Send + 'static>(Sender<Message<M>>);
 
 impl<M: Send + 'static> ActorStruct<M> {
-    pub fn new(tx: Sender<M>) -> Actor<M> {
-        Box::new(ActorStruct(tx))
+    pub fn new(tx: Sender<Message<M>>) -> ActorStruct<M> {
+        ActorStruct(tx)
     }
 }
 
-impl<M: Send + 'static> Cued for ActorStruct<M> {
-    type Message = M;
-    fn cue(&self, msg: M) -> Result<(), ActorError> {
-        self.0.send(msg).map_err(|_| ActorError::CueError)
+impl<M: Send + 'static> Actor<M> for ActorStruct<M> {
+
+    fn cue(&self, msg: M) -> ActorResult {
+        self.0.send(Message::Cue(msg)).map_err(|_| ActorError::CueError)
     }
-    fn stage(&self) -> Option<Actor<M>> {
-        Some(Self::new(self.0.clone()))
+
+    fn cut(&self) -> ActorResult {
+        self.0.send(Message::Cut).map_err(|_| ActorError::CueError)
     }
+
+    fn stage(&self) -> Option<ActorStruct<M>> { Some(Self::new(self.0.clone())) }
+
 }
 
-pub struct ActorStructMut<M: Send + 'static>(Sender<M>);
+pub struct ActorStructMut<M: Send + 'static>(Sender<Message<M>>);
 
 impl<M: Send + 'static> ActorStructMut<M> {
-    pub fn new(tx: Sender<M>) -> Actor<M> {
-        Box::new(ActorStructMut(tx))
+    pub fn new(tx: Sender<Message<M>>) -> ActorStructMut<M> {
+        ActorStructMut(tx)
     }
 }
 
-impl<M: Send + 'static> Cued for ActorStructMut<M> {
-    type Message = M;
+impl<M: Send + 'static> Actor<M> for ActorStructMut<M> {
+
     fn cue(&self, msg: M) -> Result<(), ActorError> {
-        self.0.send(msg).map_err(|_| ActorError::CueError)
+        self.0.send(Message::Cue(msg)).map_err(|_| ActorError::CueError)
     }
-    fn stage(&self) -> Option<Actor<M>> { None }
+
+    fn cut(&self) -> ActorResult {
+        self.0.send(Message::Cut).map_err(|_| ActorError::CueError)
+    }
+
+    fn stage(&self) -> Option<ActorStruct<M>> { None }
+
 }
 
 pub enum ActorError {
@@ -80,19 +100,14 @@ mod tests {
 
     use actors::*;
 
-    fn generate(x: &u8, next: &Actor<u8>) -> Result<(), ActorError> {
-        try!(next.cue(*x));
-        Ok(())
-    }
-
-    fn sum(msg: u8, x: &mut u8, next: &Actor<u8>) -> Result<(), ActorError> {
+    fn sum<A: Actor<u8>>(msg: u8, x: &mut u8, next: &A) -> Result<(), ActorError> {
         *x += msg;
         try!(next.cue(*x));
         if *x == 5 { Err(ActorError::Finished) }
         else { Ok(()) }
     }
     
-    fn double(msg: u8, next: &Actor<u8>) -> Result<(), ActorError> {
+    fn double<A: Actor<u8>>(msg: u8, next: &A) -> Result<(), ActorError> {
         try!(next.cue(msg * 2));
         Ok(())
     }
@@ -100,8 +115,18 @@ mod tests {
     #[test]
     fn actors_work() {
         let understudy = Understudy::new();
-        actor_loop!(generate, 1, actor_mut!(sum, 0, actor!(double, understudy.stage().unwrap())));
+        actor_loop!(|x: &u8, next: &ActorStructMut<u8>| next.cue(*x),
+                    1, actor_mut!(sum, 0, actor!(double, understudy.stage().unwrap())));
         assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
+    }
+
+    #[test]
+    fn actors_can_be_cued_all() {
+        let understudy = Understudy::new();
+        let actor = actor!(double, understudy.stage().unwrap());
+        assert!(actor.cue_all(0..5).is_ok());
+        assert!(actor.cut().is_ok());
+        assert_eq!(understudy.read_all(), vec![0,2,4,6,8]);
     }
 
     #[test]

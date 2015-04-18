@@ -27,7 +27,7 @@
 //!     Ok(())
 //! }
 //!
-//! fn read_input(next: &Actor<String>) -> Result<(), ActorError> {
+//! fn read_input<A: Actor<String>>(next: &A) -> Result<(), ActorError> {
 //!     let mut buffer = String::new();
 //!     if io::stdin().read_line(&mut buffer).is_ok() {
 //!         next.cue(buffer)
@@ -41,9 +41,7 @@
 //! ```
 
 mod macros;
-mod assist;
 
-pub use assist::*;
 pub mod actors;
 pub use actors::*;
 

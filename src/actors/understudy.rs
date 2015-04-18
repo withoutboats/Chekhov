@@ -13,38 +13,49 @@
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::{Actor, ActorStruct, ActorError, Cued};
+use super::{Actor, ActorStruct, ActorResult, ActorError, Message};
 
-pub struct Understudy<M: Send + 'static>(Sender<M>, Receiver<M>);
+pub struct Understudy<M: Send + 'static>(Sender<Message<M>>, Receiver<Message<M>>);
 
 impl<M: Send + 'static> Understudy<M> {
 
-    pub fn new() -> Box<Understudy<M>> {
+    pub fn new() -> Understudy<M> {
         let (tx, rx) = channel();
-        Box::new(Understudy(tx, rx))
+        Understudy(tx, rx)
     }
 
     pub fn read(&self) -> Vec<M> {
         let mut out = Vec::new();
-        while let Ok(data) = self.1.try_recv() { out.push(data); }
+        while let Ok(msg) = self.1.try_recv() {
+            match msg {
+                Message::Cue(data) => out.push(data),
+                Message::Cut => break,
+            }
+        }
         out
     }
     
     pub fn read_all(self) -> Vec<M> {
         drop(self.0);
-        self.1.iter().collect::<Vec<_>>()
+        self.1.iter().map(Message::into)
+                     .take_while(Option::is_some)
+                     .map(Option::unwrap)
+                     .collect::<Vec<_>>()
     }
     
 }
 
-impl<M: Send + 'static> Cued for Understudy<M> {
-    type Message = M;
+impl<M: Send + 'static> Actor<M> for Understudy<M> {
 
-    fn cue(&self, msg: M) -> Result<(), ActorError> {
-        self.0.send(msg).map_err(|_| ActorError::CueError)
+    fn cue(&self, msg: M) -> ActorResult {
+        self.0.send(Message::Cue(msg)).map_err(|_| ActorError::CueError)
     }
 
-    fn stage(&self) -> Option<Actor<M>> {
+    fn cut(&self) -> ActorResult {
+        self.0.send(Message::Cut).map_err(|_| ActorError::CueError)
+    }
+
+    fn stage(&self) -> Option<ActorStruct<M>> {
         Some(ActorStruct::new(self.0.clone()))
     }
 
@@ -55,7 +66,7 @@ mod tests {
 
     use actors::*;
 
-    fn fountain_5(next: Actor<u8>) {
+    fn fountain_5<A: Actor<u8>>(next: A) {
         for i in 0..5 { next.cue(i).ok(); }
     }
 
