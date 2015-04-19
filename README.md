@@ -10,7 +10,7 @@ Chkehov is highly unstable and incomplete, __do not try use it yet__. It will
 eat your laundry and set your house on fire. __Pull requests welcome.__ There's
 no documentation yet, but here's an example:
 
-```rust
+```
 #[macro_use]
 extern crate chekhov;
 
@@ -19,16 +19,15 @@ use std::io;
 
 use chekhov::*;
 
-fn print_prefixed<T: Display>(msg: T, prefix: &str) -> Result<(), ActorError> {
+fn print_prefixed<T: Display>(msg: T, prefix: &str) -> ActorResult {
     println!("{}{}", prefix, msg);
     Ok(())
-} 
+}
 
-fn read_input(next: &Actor<String>) -> Result<(), ActorError> {
+fn read_input<A: Actor<String>>(next: &A) -> ActorResult {
     let mut buffer = String::new();
-    if io::stdin().read_line(&mut buf).is_ok() {
-        next.cue(buffer)
-    } else { ActorError::Internal("Could not read from stdin.".to_string()) }
+    try!(io::stdin().read_line(&mut buffer));
+    next.cue(buffer)
 }
 
 fn main() {
@@ -36,6 +35,7 @@ fn main() {
     actor_loop!(read_input, printer);
 }
 ```
+
 
 ### Rust version compatibility
 

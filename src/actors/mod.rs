@@ -13,12 +13,14 @@
 
 pub mod understudy;
 
+use std::error::Error;
+use std::fmt;
 use std::iter::IntoIterator;
 use std::sync::mpsc::Sender;
 
 pub use self::understudy::Understudy;
 
-pub type ActorResult = Result<(), ActorError>;
+pub type ActorResult = Result<(), Box<Error>>;
 
 pub trait Actor<M: Send + 'static>: Send {
     fn cue(&self, msg: M) -> ActorResult;
@@ -56,11 +58,11 @@ impl<M: Send + 'static> ActorStruct<M> {
 impl<M: Send + 'static> Actor<M> for ActorStruct<M> {
 
     fn cue(&self, msg: M) -> ActorResult {
-        self.0.send(Message::Cue(msg)).map_err(|_| ActorError::CueError)
+        self.0.send(Message::Cue(msg)).map_err(From::from)
     }
 
     fn cut(&self) -> ActorResult {
-        self.0.send(Message::Cut).map_err(|_| ActorError::CueError)
+        self.0.send(Message::Cut).map_err(From::from)
     }
 
     fn stage(&self) -> Option<ActorStruct<M>> { Some(Self::new(self.0.clone())) }
@@ -77,22 +79,31 @@ impl<M: Send + 'static> ActorStructMut<M> {
 
 impl<M: Send + 'static> Actor<M> for ActorStructMut<M> {
 
-    fn cue(&self, msg: M) -> Result<(), ActorError> {
-        self.0.send(Message::Cue(msg)).map_err(|_| ActorError::CueError)
+    fn cue(&self, msg: M) -> ActorResult {
+        self.0.send(Message::Cue(msg)).map_err(From::from)
     }
 
     fn cut(&self) -> ActorResult {
-        self.0.send(Message::Cut).map_err(|_| ActorError::CueError)
+        self.0.send(Message::Cut).map_err(From::from)
     }
 
     fn stage(&self) -> Option<ActorStruct<M>> { None }
 
 }
 
-pub enum ActorError {
-    CueError,
-    Internal(String),
-    Finished,
+#[derive(Debug)]
+pub struct ActorFinished;
+
+impl fmt::Display for ActorFinished {
+    fn fmt(&self, _: &mut fmt::Formatter) -> Result<(), fmt::Error> { Ok(()) }
+}
+
+impl Error for ActorFinished {
+    fn description(&self) -> &str { "actor has finished working" }
+}
+
+pub fn curtain_call() -> ActorResult {
+    Err(Box::new(ActorFinished))
 }
 
 #[cfg(test)]
@@ -100,14 +111,14 @@ mod tests {
 
     use actors::*;
 
-    fn sum<A: Actor<u8>>(msg: u8, x: &mut u8, next: &A) -> Result<(), ActorError> {
+    fn sum<A: Actor<u8>>(msg: u8, x: &mut u8, next: &A) -> ActorResult {
         *x += msg;
         try!(next.cue(*x));
-        if *x == 5 { Err(ActorError::Finished) }
+        if *x == 5 { curtain_call() }
         else { Ok(()) }
     }
     
-    fn double<A: Actor<u8>>(msg: u8, next: &A) -> Result<(), ActorError> {
+    fn double<A: Actor<u8>>(msg: u8, next: &A) -> ActorResult {
         try!(next.cue(msg * 2));
         Ok(())
     }

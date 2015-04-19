@@ -13,7 +13,7 @@
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::{Actor, ActorStruct, ActorResult, ActorError, Message};
+use super::{Actor, ActorStruct, ActorResult, Message};
 
 pub struct Understudy<M: Send + 'static>(Sender<Message<M>>, Receiver<Message<M>>);
 
@@ -48,11 +48,11 @@ impl<M: Send + 'static> Understudy<M> {
 impl<M: Send + 'static> Actor<M> for Understudy<M> {
 
     fn cue(&self, msg: M) -> ActorResult {
-        self.0.send(Message::Cue(msg)).map_err(|_| ActorError::CueError)
+        self.0.send(Message::Cue(msg)).map_err(From::from)
     }
 
     fn cut(&self) -> ActorResult {
-        self.0.send(Message::Cut).map_err(|_| ActorError::CueError)
+        self.0.send(Message::Cut).map_err(From::from)
     }
 
     fn stage(&self) -> Option<ActorStruct<M>> {

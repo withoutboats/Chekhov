@@ -22,16 +22,15 @@
 //!
 //! use chekhov::*;
 //!
-//! fn print_prefixed<T: Display>(msg: T, prefix: &str) -> Result<(), ActorError> {
+//! fn print_prefixed<T: Display>(msg: T, prefix: &str) -> ActorResult {
 //!     println!("{}{}", prefix, msg);
 //!     Ok(())
 //! }
 //!
-//! fn read_input<A: Actor<String>>(next: &A) -> Result<(), ActorError> {
+//! fn read_input<A: Actor<String>>(next: &A) -> ActorResult {
 //!     let mut buffer = String::new();
-//!     if io::stdin().read_line(&mut buffer).is_ok() {
-//!         next.cue(buffer)
-//!     } else { Err(ActorError::Internal("Could not read from stdin.".to_string())) }
+//!     try!(io::stdin().read_line(&mut buffer));
+//!     next.cue(buffer)
 //! }
 //! 
 //! fn main() {
