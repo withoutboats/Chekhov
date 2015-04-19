@@ -10,7 +10,7 @@ Chkehov is highly unstable and incomplete, __do not try use it yet__. It will
 eat your laundry and set your house on fire. __Pull requests welcome.__ There's
 no documentation yet, but here's an example:
 
-```
+```rust
 #[macro_use]
 extern crate chekhov;
 
