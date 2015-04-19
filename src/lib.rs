@@ -27,7 +27,7 @@
 //!     Ok(())
 //! }
 //!
-//! fn read_input<A: Actor<String>>(next: &A) -> ActorResult {
+//! fn read_input(next: &Actor<String>) -> ActorResult {
 //!     let mut buffer = String::new();
 //!     try!(io::stdin().read_line(&mut buffer));
 //!     next.cue(buffer)

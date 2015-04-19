@@ -13,7 +13,7 @@
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use super::{Actor, ActorStruct, ActorResult, Message};
+use super::{Actor, Message};
 
 pub struct Understudy<M: Send + 'static>(Sender<Message<M>>, Receiver<Message<M>>);
 
@@ -22,6 +22,11 @@ impl<M: Send + 'static> Understudy<M> {
     pub fn new() -> Understudy<M> {
         let (tx, rx) = channel();
         Understudy(tx, rx)
+    }
+
+    pub fn recv(&self) -> Option<M> {
+        self.1.try_recv().ok().map(Message::into)   // Option<Message<M>> -> Option<Option<M>>
+                              .map(Option::unwrap)  // Option<Option<M>> -> Option<M>
     }
 
     pub fn read(&self) -> Vec<M> {
@@ -37,26 +42,14 @@ impl<M: Send + 'static> Understudy<M> {
     
     pub fn read_all(self) -> Vec<M> {
         drop(self.0);
-        self.1.iter().map(Message::into)
-                     .take_while(Option::is_some)
-                     .map(Option::unwrap)
-                     .collect::<Vec<_>>()
+        self.1.iter().map(Message::into)            // Message<M> -> Option<M>
+                     .take_while(Option::is_some)   // Exclude None
+                     .map(Option::unwrap)           // Option<M> -> M
+                     .collect::<Vec<_>>()           // Collect into a Vec
     }
     
-}
-
-impl<M: Send + 'static> Actor<M> for Understudy<M> {
-
-    fn cue(&self, msg: M) -> ActorResult {
-        self.0.send(Message::Cue(msg)).map_err(From::from)
-    }
-
-    fn cut(&self) -> ActorResult {
-        self.0.send(Message::Cut).map_err(From::from)
-    }
-
-    fn stage(&self) -> Option<ActorStruct<M>> {
-        Some(ActorStruct::new(self.0.clone()))
+    pub fn stage(&self) -> Actor<M> {
+        Actor::new(self.0.clone())
     }
 
 }
@@ -66,22 +59,15 @@ mod tests {
 
     use actors::*;
 
-    fn fountain_5<A: Actor<u8>>(next: A) {
+    fn fountain_5(next: Actor<u8>) {
         for i in 0..5 { next.cue(i).ok(); }
     }
 
     #[test]
     fn it_collects_messages_sent_to_it() {
         let understudy = super::Understudy::new();
-        fountain_5(understudy.stage().unwrap());
+        fountain_5(understudy.stage());
         assert_eq!(understudy.read_all(), vec![0,1,2,3,4]);
-    }
-
-    #[test]
-    fn it_can_be_cued_directly() {
-        let understudy = super::Understudy::new();
-        assert!(understudy.cue(0u8).is_ok());
-        assert_eq!(understudy.read_all(), vec![0]);
     }
 
 }
