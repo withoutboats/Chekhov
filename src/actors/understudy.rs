@@ -33,7 +33,7 @@ impl<M: Send + 'static> Understudy<M> {
         self.rx.iter().collect()
     }
 
-    pub fn stage(&self) -> super::Actor<M> { self.actor.duplicate().unwrap() }
+    pub fn stage(&self) -> super::Actor<M> { self.actor.stage() }
 
     pub fn try_recv(&self) -> Result<M, mpsc::TryRecvError> { self.rx.try_recv() }
 

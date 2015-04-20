@@ -15,16 +15,19 @@
 
 #[macro_export]
 macro_rules! actor {
+    ($script:expr)               => ( actor_expand!(actor $script => () ()) );
     ($script:expr, $($e:expr),*) => ( actor_expand!(actor $script => ($($e,)*) ()) );
 }
 
 #[macro_export]
 macro_rules! actor_mut {
+    ($script:expr)               => ( actor_expand!(actor_mut $script => () ()) );
     ($script:expr, $($e:expr),*) => ( actor_expand!(actor_mut $script => ($($e,)*) ()) );
 }
 
 #[macro_export]
 macro_rules! actor_loop {
+    ($script:expr)               => ( actor_expand!(actor_loop $script => () ()) );
     ($script:expr, $($e:expr),*) => ( actor_expand!(actor_loop $script => ($($e,)*) ()) );
 }
 
@@ -36,23 +39,90 @@ macro_rules! actor_expand {
     });
     (actor $script:expr => () ($($bound:ident),*)) => ({
         let (tx, rx) = ::std::sync::mpsc::channel();
-        ::std::thread::spawn(move || while let Ok(Message::Cue(msg)) = rx.recv() {
-            if $script(msg, $( &$bound, )*).is_err() { break; }
+        ::std::thread::spawn(move || {
+            let mut active = false;
+            let mut messages = Vec::new();
+            'receiving: while let Ok(msg) = rx.recv() {
+                match (msg, active) {
+                    ($crate::Message::Cue(data), false) => { messages.push(data); }
+                    ($crate::Message::Cue(data), true)  => {
+                        if $script(data, $( &$bound, )*).is_err() { break 'receiving; }
+                    }
+                    ($crate::Message::Start, false)     => {
+                        for data in messages {
+                            if $script(data, $( &$bound, )*).is_err() { break 'receiving; }
+                        }
+                        messages = Vec::new();
+                        active = true;
+                    }
+                    ($crate::Message::Pause, true)      => { active = false; }
+                    ($crate::Message::Cut, _)           => {
+                        for data in messages {
+                            if $script(data, $( &$bound, )*).is_err() { break 'receiving; }
+                        }
+                        break 'receiving;
+                    }
+                    _ => (),
+                }
+            }
         });
-        Actor::new(tx)
+        $crate::Actor::new(tx)
     });
     (actor_mut $script:expr => () ($($bound:ident),*)) => ({
-        $( let mut $bound = $bound; )*
         let (tx, rx) = ::std::sync::mpsc::channel();
-        ::std::thread::spawn(move || while let Ok(Message::Cue(msg)) = rx.recv() {
-            if $script(msg, $( &mut $bound, )*).is_err() { break; }
+        ::std::thread::spawn(move || {
+            $( let mut $bound = $bound; )*
+            let mut active = false;
+            let mut messages = Vec::new();
+            'receiving: while let Ok(msg) = rx.recv() {
+                match (msg, active) {
+                    ($crate::Message::Cue(data), false) => { messages.push(data); }
+                    ($crate::Message::Cue(data), true)  => {
+                        if $script(data, $( &mut $bound, )*).is_err() { break 'receiving; }
+                    }
+                    ($crate::Message::Start, false)     => {
+                        for data in messages {
+                            if $script(data, $( &mut $bound, )*).is_err() { break 'receiving; }
+                        }
+                        messages = Vec::new();
+                        active = true;
+                    }
+                    ($crate::Message::Pause, true)      => { active = false; }
+                    ($crate::Message::Cut, _)           => {
+                        for data in messages {
+                            if $script(data, $( &mut $bound, )*).is_err() { break 'receiving; }
+                        }
+                        break 'receiving;
+                    }
+                    _ => (),
+                }
+            }
         });
-        Actor::new(tx)
+        $crate::Actor::new_mut(tx)
     });
     (actor_loop $script:expr => () ($($bound:ident),*)) => ({
         $( let mut $bound = $bound; )*
-        ::std::thread::spawn(move || loop {
-            if $script($( &mut $bound, )*).is_err() { break; }
+        let (tx, rx) = ::std::sync::mpsc::channel();
+        ::std::thread::spawn(move || {
+            let mut active = false;
+            'receiving: loop {
+                if active {
+                    match rx.try_recv() {
+                        Ok($crate::Message::Pause) => { active = false; }
+                        Ok(_) | Err(::std::sync::mpsc::TryRecvError::Empty) => loop {
+                            if $script($( &mut $bound, )*).is_err() { break 'receiving; }
+                        },
+                        _ => break 'receiving,
+                    }
+                } else {
+                    match rx.recv() {
+                        Ok($crate::Message::Start) => { active = true; }
+                        Err(::std::sync::mpsc::RecvError) => break 'receiving,
+                        _ => (),
+                    }
+                }
+            }
         });
+        $crate::Actor::<$crate::Null>::new_loop(tx)
     });
 }

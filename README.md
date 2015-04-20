@@ -17,12 +17,7 @@ extern crate chekhov;
 use std::fmt::Display;
 use std::io;
 
-use chekhov::*;
-
-fn print_prefixed<T: Display>(msg: T, prefix: &str) -> ActorResult {
-    println!("{}{}", prefix, msg);
-    Ok(())
-}
+use chekhov::{Actor, ActorResult}
 
 fn read_input(next: &Actor<String>) -> ActorResult {
     let mut buffer = String::new();
@@ -31,8 +26,9 @@ fn read_input(next: &Actor<String>) -> ActorResult {
 }
 
 fn main() {
-    let printer = actor!(print_prefixed, ">>> ");
-    actor_loop!(read_input, printer);
+    let printer = actor!(|msg: String| -> ActorResult { println("{}", msg); Ok(()) });
+    let reader  = actor_loop!(read_input, printer.stage());
+    chekhov::from_the_top(vec![&printer, &reader]).ok();
 }
 ```
 
