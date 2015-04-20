@@ -102,7 +102,7 @@ mod tests {
 
     use actors::*;
 
-        fn sum(msg: u8, x: &mut u8, next: &Actor<u8>) -> ActorResult {
+        fn sum_until_5(msg: u8, x: &mut u8, next: &Actor<u8>) -> ActorResult {
         *x += msg;
         try!(next.cue(*x));
         if *x == 5 { curtain_call() }
@@ -115,15 +115,15 @@ mod tests {
     }
 
     #[test]
-    fn actors_work() {
+    fn actor_macros_expand_correctly() {
         let understudy = Understudy::new();
-        actor_loop!(|x: &u8, next: &Actor<u8>| next.cue(*x),
-                    1, actor_mut!(sum, 0, actor!(double, understudy.stage())));
+        let actor = actor_mut!(sum_until_5, 0, actor!(double, understudy.stage()));
+        actor_loop!(|x: &u8| actor.cue(*x), 1);
         assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
     }
 
     #[test]
-    fn actors_can_be_cued_all() {
+    fn can_cue_all_and_cut() {
         let understudy = Understudy::new();
         let actor = actor!(double, understudy.stage());
         assert!(actor.cue_all(0..5).is_ok());
