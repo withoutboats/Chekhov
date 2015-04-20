@@ -11,47 +11,38 @@
 // You should have received a copy of the GNU General Public License along with Chekhov. If not see
 // <https://www.gnu.org/licenses/>.
 
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc;
 
-use super::{Actor, Message};
-
-pub struct Understudy<M: Send + 'static>(Sender<Message<M>>, Receiver<Message<M>>);
+pub struct Understudy<M: Send + 'static> {
+    actor: super::Actor<M>,
+    rx: mpsc::Receiver<M>,
+}
 
 impl<M: Send + 'static> Understudy<M> {
 
     pub fn new() -> Understudy<M> {
-        let (tx, rx) = channel();
-        Understudy(tx, rx)
-    }
-
-    pub fn recv(&self) -> Option<M> {
-        self.1.try_recv().ok().map(Message::into)   // Option<Message<M>> -> Option<Option<M>>
-                              .map(Option::unwrap)  // Option<Option<M>> -> Option<M>
-    }
-
-    pub fn read(&self) -> Vec<M> {
-        let mut out = Vec::new();
-        while let Ok(msg) = self.1.try_recv() {
-            match msg {
-                Message::Cue(data) => out.push(data),
-                Message::Cut => break,
-            }
+        let (tx, rx) = mpsc::channel();
+        Understudy {
+            actor: super::Actor::new_understudy(tx),
+            rx: rx,
         }
-        out
-    }
-    
-    pub fn read_all(self) -> Vec<M> {
-        drop(self.0);
-        self.1.iter().map(Message::into)            // Message<M> -> Option<M>
-                     .take_while(Option::is_some)   // Exclude None
-                     .map(Option::unwrap)           // Option<M> -> M
-                     .collect::<Vec<_>>()           // Collect into a Vec
-    }
-    
-    pub fn stage(&self) -> Actor<M> {
-        Actor::new(self.0.clone())
     }
 
+    pub fn read_all(self) -> Vec<M> {
+        drop(self.actor);
+        self.rx.iter().collect()
+    }
+
+    pub fn stage(&self) -> super::Actor<M> { self.actor.duplicate().unwrap() }
+
+    pub fn try_recv(&self) -> Result<M, mpsc::TryRecvError> { self.rx.try_recv() }
+
+    pub fn recv(&self) -> Result<M, mpsc::RecvError> { self.rx.recv() }
+
+}
+
+impl<M: Send + 'static> Into<mpsc::Receiver<M>> for Understudy<M> {
+    fn into(self) -> mpsc::Receiver<M> { self.rx }
 }
 
 #[cfg(test)]
@@ -64,10 +55,15 @@ mod tests {
     }
 
     #[test]
-    fn it_collects_messages_sent_to_it() {
-        let understudy = super::Understudy::new();
+    fn collects_messages_sent_to_it() {
+        let understudy = Understudy::new();
         fountain_5(understudy.stage());
         assert_eq!(understudy.read_all(), vec![0,1,2,3,4]);
+    }
+
+    #[test]
+    fn can_be_cast_to_a_receiver() {
+        let _: ::std::sync::mpsc::Receiver<i32> = Understudy::new().into();
     }
 
 }

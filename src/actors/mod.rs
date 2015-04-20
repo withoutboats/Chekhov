@@ -20,15 +20,27 @@ use std::sync::mpsc::Sender;
 
 pub use self::understudy::Understudy;
 
-#[derive(Clone)]
-pub struct Actor<M: Send + 'static>(Sender<Message<M>>);
+pub enum Actor<M: Send + 'static> {
+    Actor(Sender<Message<M>>),
+    ActorMut(Sender<Message<M>>),
+    Understudy(Sender<M>),
+}
 
 impl<M: Send + 'static> Actor<M> {
 
-    pub fn new(tx: Sender<Message<M>>) -> Actor<M> { Actor(tx) }
+    pub fn new(tx: Sender<Message<M>>) -> Actor<M> { Actor::Actor(tx) }
+
+    pub fn new_mut(tx: Sender<Message<M>>) -> Actor<M> { Actor::ActorMut(tx) }
+
+    pub fn new_understudy(tx: Sender<M>) -> Actor<M> { Actor::Understudy(tx) }
 
     pub fn cue(&self, msg: M) -> ActorResult {
-        self.0.send(Message::Cue(msg)).map_err(From::from)
+        match *self {
+            Actor::Actor(ref tx)
+                | Actor::ActorMut(ref tx)
+                => tx.send(Message::Cue(msg)).map_err(From::from),
+            Actor::Understudy(ref tx) => tx.send(msg).map_err(From::from)
+        }
     }
 
     pub fn cue_all<I: IntoIterator<Item=M>>(&self, iterable: I) -> ActorResult {
@@ -37,7 +49,20 @@ impl<M: Send + 'static> Actor<M> {
     }
 
     pub fn cut(&self) -> ActorResult {
-        self.0.send(Message::Cut).map_err(From::from)
+        match *self {
+            Actor::Actor(ref tx)
+                | Actor::ActorMut(ref tx)
+                => tx.send(Message::Cut).map_err(From::from),
+            _ => Ok(())
+        }
+    }
+
+    pub fn duplicate(&self) -> Option<Actor<M>> {
+        match * self {
+            Actor::Actor(ref tx) => Some(Actor::new(tx.clone())),
+            Actor::ActorMut(_) => None,
+            Actor::Understudy(ref tx) => Some(Actor::new_understudy(tx.clone())),
+        }
     }
 
 }
@@ -93,7 +118,7 @@ mod tests {
     fn actors_work() {
         let understudy = Understudy::new();
         actor_loop!(|x: &u8, next: &Actor<u8>| next.cue(*x),
-                    1, actor!(sum, 0, actor!(double, understudy.stage())));
+                    1, actor_mut!(sum, 0, actor!(double, understudy.stage())));
         assert_eq!(understudy.read_all(), vec![2,4,6,8,10]);
     }
 

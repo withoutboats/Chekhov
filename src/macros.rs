@@ -15,28 +15,42 @@
 
 #[macro_export]
 macro_rules! actor {
-    ($script:expr, $($e:expr),*) => { actor_expand!(actor $script => ($($e,)*), ()) }
+    ($script:expr, $($e:expr),*) => ( actor_expand!(actor $script => ($($e,)*) ()) );
+}
+
+#[macro_export]
+macro_rules! actor_mut {
+    ($script:expr, $($e:expr),*) => ( actor_expand!(actor_mut $script => ($($e,)*) ()) );
 }
 
 #[macro_export]
 macro_rules! actor_loop {
-    ($script:expr, $($e:expr),*) => { actor_expand!(actor_loop $script => ($($e,)*), ()) }
+    ($script:expr, $($e:expr),*) => ( actor_expand!(actor_loop $script => ($($e,)*) ()) );
 }
 
 #[macro_export]
 macro_rules! actor_expand {
-    ($kind:ident $script:expr => ($head:expr, $($rest:expr,)*), ($($bound:ident),*)) => ({
-        let mut binding = $head;
-        actor_expand!($kind $script => ($($rest,)*), ($($bound,)* binding))
+    ($kind:ident $script:expr => ($head:expr, $($rest:expr,)*) ($($bound:ident),*)) => ({
+        let binding = $head;
+        actor_expand!($kind $script => ($($rest,)*) ($($bound,)* binding))
     });
-    (actor $script:expr => (), ($($bound:ident),*)) => ({
+    (actor $script:expr => () ($($bound:ident),*)) => ({
+        let (tx, rx) = ::std::sync::mpsc::channel();
+        ::std::thread::spawn(move || while let Ok(Message::Cue(msg)) = rx.recv() {
+            if $script(msg, $( &$bound, )*).is_err() { break; }
+        });
+        Actor::new(tx)
+    });
+    (actor_mut $script:expr => () ($($bound:ident),*)) => ({
+        $( let mut $bound = $bound; )*
         let (tx, rx) = ::std::sync::mpsc::channel();
         ::std::thread::spawn(move || while let Ok(Message::Cue(msg)) = rx.recv() {
             if $script(msg, $( &mut $bound, )*).is_err() { break; }
         });
         Actor::new(tx)
     });
-    (actor_loop $script:expr => (), ($($bound:ident),*)) => ({
+    (actor_loop $script:expr => () ($($bound:ident),*)) => ({
+        $( let mut $bound = $bound; )*
         ::std::thread::spawn(move || loop {
             if $script($( &mut $bound, )*).is_err() { break; }
         });
